@@ -1,0 +1,22 @@
+{
+    "name": "companion-module-dalite-screen",
+    "version": "0.1.0",
+    "description": "Da-Lite motorized projection screen module — Up, Down, Stop via HTTP.",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"No tests\" && exit 0"
+    },
+    "dependencies": {
+        "@companion-module/base": "^0.6.0"
+    },
+    "author": "davet",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/DaveHannon-Personal/companion-da-lite-screen.git"
+    },
+    "bugs": {
+        "url": "https://github.com/DaveHannon-Personal/companion-da-lite-screen/issues"
+    },
+    "homepage": "https://github.com/DaveHannon-Personal/companion-da-lite-screen#readme"
+}

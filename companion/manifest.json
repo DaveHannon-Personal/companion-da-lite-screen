@@ -1,0 +1,26 @@
+{
+    "id": "dalite-screen",
+    "name": "Da-Lite Screen",
+    "shortname": "Da-Lite Screen",
+    "description": "Control a Da-Lite motorized projection screen (Up, Down, Stop) via its HTTP web controller.",
+    "manufacturer": "Da-Lite",
+    "products": ["Motorized Screen", "Net Controller"],
+    "keywords": ["dalite", "da-lite", "screen", "projection", "motorized"],
+    "version": "0.1.0",
+    "license": "MIT",
+    "repository": "git+https://github.com/DaveHannon-Personal/companion-da-lite-screen.git",
+    "bugs": "https://github.com/DaveHannon-Personal/companion-da-lite-screen/issues",
+    "maintainers": [
+        {
+            "name": "davet",
+            "email": ""
+        }
+    ],
+    "legacyIds": [],
+    "runtime": {
+        "type": "node22",
+        "api": "nodejs-ipc",
+        "apiVersion": "0.6.0",
+        "entrypoint": "../index.js"
+    }
+}
