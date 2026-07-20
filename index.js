@@ -11,7 +11,7 @@
  * exact paths your controller uses.
  */
 
-const { InstanceBase, Regex, runEntrypoint } = require('@companion-module/base')
+const { InstanceBase, InstanceStatus, Regex, runEntrypoint } = require('@companion-module/base')
 
 class DaLiteScreenInstance extends InstanceBase {
     constructor(internal) {
@@ -24,7 +24,7 @@ class DaLiteScreenInstance extends InstanceBase {
 
     async init(config) {
         this.config = config
-        this.updateStatus('ok')
+        this.updateStatus(InstanceStatus.Ok)
         this.initActions()
         this.initPresets()
     }
@@ -35,7 +35,7 @@ class DaLiteScreenInstance extends InstanceBase {
 
     async configUpdated(config) {
         this.config = config
-        this.updateStatus('ok')
+        this.updateStatus(InstanceStatus.Ok)
     }
 
     // ---------------------------------------------------------------------------

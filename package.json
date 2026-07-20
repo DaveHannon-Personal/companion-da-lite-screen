@@ -7,7 +7,7 @@
         "test": "echo \"No tests\" && exit 0"
     },
     "dependencies": {
-        "@companion-module/base": "^0.6.0"
+        "@companion-module/base": "^1.14.1"
     },
     "author": "davet",
     "license": "MIT",
