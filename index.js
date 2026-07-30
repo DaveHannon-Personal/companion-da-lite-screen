@@ -3,7 +3,6 @@
  * Da-Lite motorized projection screen — Up / Down / Stop / Preset via SSH (clish).
  *
  * Connects to the screen controller over SSH and sends clish commands.
- * All connection details and command strings are configurable in the module settings.
  */
 
 const { InstanceBase, Regex, runEntrypoint } = require('@companion-module/base')
@@ -78,48 +77,6 @@ class DaLiteScreenInstance extends InstanceBase {
                 width: 6,
                 default: 'nhopecc6',
             },
-            {
-                type: 'static-text',
-                id: 'cmd_header',
-                label: 'Clish Commands',
-                value: 'The clish command sent for each action. Edit these if your firmware uses different syntax.',
-                width: 12,
-            },
-            {
-                type: 'textinput',
-                id: 'cmd_up',
-                label: 'Up Command',
-                width: 12,
-                default: 'screen move up',
-            },
-            {
-                type: 'textinput',
-                id: 'cmd_down',
-                label: 'Down Command',
-                width: 12,
-                default: 'screen move down',
-            },
-            {
-                type: 'textinput',
-                id: 'cmd_stop',
-                label: 'Stop Command',
-                width: 12,
-                default: 'screen move stop',
-            },
-            {
-                type: 'textinput',
-                id: 'cmd_preset1',
-                label: 'Preset 1 Command',
-                width: 12,
-                default: 'screen preset recall 1',
-            },
-            {
-                type: 'textinput',
-                id: 'cmd_preset2',
-                label: 'Preset 2 Command',
-                width: 12,
-                default: 'screen preset recall 2',
-            },
         ]
     }
 
@@ -192,7 +149,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Up',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand(this.config.cmd_up || 'screen move up')
+                    await this.sendCommand('screen move up\r')
                 },
             },
 
@@ -200,7 +157,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Down',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand(this.config.cmd_down || 'screen move down')
+                    await this.sendCommand('screen move down\r')
                 },
             },
 
@@ -208,7 +165,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Stop',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand(this.config.cmd_stop || 'screen move stop')
+                    await this.sendCommand('screen move stop\r')
                 },
             },
 
@@ -216,7 +173,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Preset 1',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand(this.config.cmd_preset1 || 'screen preset recall 1')
+                    await this.sendCommand('screen preset recall 1\r')
                 },
             },
 
@@ -224,7 +181,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Preset 2',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand(this.config.cmd_preset2 || 'screen preset recall 2')
+                    await this.sendCommand('screen preset recall 2\r')
                 },
             },
         })
