@@ -85,7 +85,8 @@ class DaLiteScreenInstance extends InstanceBase {
     // ---------------------------------------------------------------------------
 
     /**
-     * Open an SSH connection, execute a single clish command, then close.
+     * Open an SSH shell session, send a clish command followed by a newline
+     * (mimicking a user typing the command and pressing Enter), then close.
      * @param {string} command  The clish command string to execute
      */
     sendCommand(command) {
@@ -99,24 +100,26 @@ class DaLiteScreenInstance extends InstanceBase {
 
             conn.on('ready', () => {
                 this.log('debug', `SSH connected — sending: ${command}`)
-                conn.exec(command, (err, stream) => {
+                conn.shell((err, stream) => {
                     if (err) {
                         conn.end()
                         return reject(err)
                     }
 
-                    let stderr = ''
-                    stream.stderr.on('data', (data) => { stderr += data })
-
-                    stream.on('close', (code) => {
+                    stream.on('close', () => {
                         conn.end()
-                        if (code !== 0) {
-                            this.log('warn', `Command exited with code ${code}${stderr ? ': ' + stderr.trim() : ''}`)
-                        } else {
-                            this.log('debug', `Command OK (exit 0)`)
-                        }
+                        this.log('debug', `Shell closed after command`)
                         resolve()
                     })
+
+                    // Wait for the clish prompt, then send command + newline
+                    setTimeout(() => {
+                        stream.write(command + '\n')
+                        // Give the device time to process, then close
+                        setTimeout(() => {
+                            stream.end('exit\n')
+                        }, 500)
+                    }, 500)
                 })
             })
 
@@ -149,7 +152,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Up',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand('screen move up\r')
+                    await this.sendCommand('screen move up')
                 },
             },
 
@@ -157,7 +160,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Down',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand('screen move down\r')
+                    await this.sendCommand('screen move down')
                 },
             },
 
@@ -165,7 +168,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Stop',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand('screen move stop\r')
+                    await this.sendCommand('screen move stop')
                 },
             },
 
@@ -173,7 +176,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Preset 1',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand('screen preset recall 1\r')
+                    await this.sendCommand('screen preset recall 1')
                 },
             },
 
@@ -181,7 +184,7 @@ class DaLiteScreenInstance extends InstanceBase {
                 name: 'Screen Preset 2',
                 options: [],
                 callback: async () => {
-                    await this.sendCommand('screen preset recall 2\r')
+                    await this.sendCommand('screen preset recall 2')
                 },
             },
         })
