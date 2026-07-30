@@ -134,8 +134,8 @@ class DaLiteScreenInstance extends InstanceBase {
                         setTimeout(() => {
                             this.log('info', `Closing shell`)
                             stream.end('exit\n')
-                        }, 1000)
-                    }, 1000)
+                        }, 300)
+                    }, 200)
                 })
             })
 
