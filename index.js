@@ -92,40 +92,64 @@ class DaLiteScreenInstance extends InstanceBase {
     sendCommand(command) {
         return new Promise((resolve, reject) => {
             if (!this.config.host) {
-                this.log('warn', 'No host configured')
+                this.log('warn', 'No host configured — set IP in module settings')
                 return resolve()
             }
+
+            this.log('info', `Connecting to ${this.config.host}:${this.config.port || 22} as ${this.config.username || 'admin'}`)
 
             const conn = new Client()
 
             conn.on('ready', () => {
-                this.log('debug', `SSH connected — sending: ${command}`)
+                this.log('info', `SSH connected — opening shell`)
                 conn.shell((err, stream) => {
                     if (err) {
+                        this.log('error', `Failed to open shell: ${err.message}`)
                         conn.end()
                         return reject(err)
                     }
 
+                    this.log('info', `Shell open — waiting for clish prompt`)
+
+                    // Log everything the device sends back
+                    stream.on('data', (data) => {
+                        this.log('debug', `Device says: ${data.toString().replace(/[\r\n]+/g, ' ').trim()}`)
+                    })
+
+                    stream.stderr.on('data', (data) => {
+                        this.log('warn', `Device stderr: ${data.toString().trim()}`)
+                    })
+
                     stream.on('close', () => {
                         conn.end()
-                        this.log('debug', `Shell closed after command`)
+                        this.log('info', `Shell closed`)
                         resolve()
                     })
 
                     // Wait for the clish prompt, then send command + newline
                     setTimeout(() => {
+                        this.log('info', `Sending command: ${command}`)
                         stream.write(command + '\n')
                         // Give the device time to process, then close
                         setTimeout(() => {
+                            this.log('info', `Closing shell`)
                             stream.end('exit\n')
-                        }, 500)
-                    }, 500)
+                        }, 1000)
+                    }, 1000)
                 })
+            })
+
+            conn.on('banner', (msg) => {
+                this.log('debug', `SSH banner: ${msg.trim()}`)
             })
 
             conn.on('error', (err) => {
                 this.log('error', `SSH error: ${err.message}`)
                 reject(err)
+            })
+
+            conn.on('close', () => {
+                this.log('debug', `SSH connection closed`)
             })
 
             conn.connect({
@@ -134,7 +158,6 @@ class DaLiteScreenInstance extends InstanceBase {
                 username: this.config.username || 'admin',
                 password: this.config.password || '',
                 readyTimeout: 5000,
-                // Accept any host key — the controller may not have a known_hosts entry
                 hostVerifier: () => true,
             })
         }).catch((err) => {
