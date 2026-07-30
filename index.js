@@ -11,6 +11,9 @@ const { Client } = require('ssh2')
 class DaLiteScreenInstance extends InstanceBase {
     constructor(internal) {
         super(internal)
+        this.conn = null
+        this.stream = null
+        this.reconnectTimer = null
     }
 
     // ---------------------------------------------------------------------------
@@ -19,18 +22,29 @@ class DaLiteScreenInstance extends InstanceBase {
 
     async init(config) {
         this.config = config
-        this.updateStatus('ok')
         this.initActions()
         this.initPresets()
+        this.connect()
     }
 
     async destroy() {
-        // Nothing persistent to clean up
+        this.cancelReconnect()
+        if (this.conn) {
+            this.conn.end()
+            this.conn = null
+            this.stream = null
+        }
     }
 
     async configUpdated(config) {
         this.config = config
-        this.updateStatus('ok')
+        this.cancelReconnect()
+        if (this.conn) {
+            this.conn.end()
+            this.conn = null
+            this.stream = null
+        }
+        this.connect()
     }
 
     // ---------------------------------------------------------------------------
@@ -81,88 +95,95 @@ class DaLiteScreenInstance extends InstanceBase {
     }
 
     // ---------------------------------------------------------------------------
-    // SSH helper
+    // Persistent SSH connection
     // ---------------------------------------------------------------------------
 
-    /**
-     * Open an SSH shell session, send a clish command followed by a newline
-     * (mimicking a user typing the command and pressing Enter), then close.
-     * @param {string} command  The clish command string to execute
-     */
-    sendCommand(command) {
-        return new Promise((resolve, reject) => {
-            if (!this.config.host) {
-                this.log('warn', 'No host configured — set IP in module settings')
-                return resolve()
-            }
+    cancelReconnect() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+        }
+    }
 
-            this.log('info', `Connecting to ${this.config.host}:${this.config.port || 22} as ${this.config.username || 'admin'}`)
+    connect() {
+        if (!this.config.host) {
+            this.updateStatus('bad_config', 'No host configured')
+            return
+        }
 
-            const conn = new Client()
+        this.updateStatus('connecting')
+        this.log('info', `Connecting to ${this.config.host}:${this.config.port || 22}`)
 
-            conn.on('ready', () => {
-                this.log('info', `SSH connected — opening shell`)
-                conn.shell((err, stream) => {
-                    if (err) {
-                        this.log('error', `Failed to open shell: ${err.message}`)
-                        conn.end()
-                        return reject(err)
-                    }
+        const conn = new Client()
+        this.conn = conn
 
-                    this.log('info', `Shell open — waiting for clish prompt`)
+        conn.on('ready', () => {
+            this.log('info', 'SSH connected — opening shell')
+            conn.shell((err, stream) => {
+                if (err) {
+                    this.log('error', `Failed to open shell: ${err.message}`)
+                    this.updateStatus('connection_failure', err.message)
+                    this.scheduleReconnect()
+                    return
+                }
 
-                    // Log everything the device sends back
-                    stream.on('data', (data) => {
-                        this.log('debug', `Device says: ${data.toString().replace(/[\r\n]+/g, ' ').trim()}`)
-                    })
+                this.stream = stream
+                this.updateStatus('ok')
+                this.log('info', 'Shell ready — commands will fire immediately')
 
-                    stream.stderr.on('data', (data) => {
-                        this.log('warn', `Device stderr: ${data.toString().trim()}`)
-                    })
+                stream.on('data', (data) => {
+                    this.log('debug', `Device: ${data.toString().replace(/[\r\n]+/g, ' ').trim()}`)
+                })
 
-                    stream.on('close', () => {
-                        conn.end()
-                        this.log('info', `Shell closed`)
-                        resolve()
-                    })
+                stream.stderr.on('data', (data) => {
+                    this.log('warn', `Device stderr: ${data.toString().trim()}`)
+                })
 
-                    // Wait for the clish prompt, then send command + newline
-                    setTimeout(() => {
-                        this.log('info', `Sending command: ${command}`)
-                        stream.write(command + '\n')
-                        // Give the device time to process, then close
-                        setTimeout(() => {
-                            this.log('info', `Closing shell`)
-                            stream.end('exit\n')
-                        }, 300)
-                    }, 200)
+                stream.on('close', () => {
+                    this.log('warn', 'Shell closed — will reconnect')
+                    this.stream = null
+                    this.conn = null
+                    this.updateStatus('connection_failure', 'Shell closed')
+                    this.scheduleReconnect()
                 })
             })
-
-            conn.on('banner', (msg) => {
-                this.log('debug', `SSH banner: ${msg.trim()}`)
-            })
-
-            conn.on('error', (err) => {
-                this.log('error', `SSH error: ${err.message}`)
-                reject(err)
-            })
-
-            conn.on('close', () => {
-                this.log('debug', `SSH connection closed`)
-            })
-
-            conn.connect({
-                host: this.config.host,
-                port: this.config.port || 22,
-                username: this.config.username || 'admin',
-                password: this.config.password || '',
-                readyTimeout: 5000,
-                hostVerifier: () => true,
-            })
-        }).catch((err) => {
-            this.log('error', `sendCommand failed: ${err.message}`)
         })
+
+        conn.on('error', (err) => {
+            this.log('error', `SSH error: ${err.message}`)
+            this.stream = null
+            this.conn = null
+            this.updateStatus('connection_failure', err.message)
+            this.scheduleReconnect()
+        })
+
+        conn.connect({
+            host: this.config.host,
+            port: this.config.port || 22,
+            username: this.config.username || 'admin',
+            password: this.config.password || '',
+            readyTimeout: 5000,
+            hostVerifier: () => true,
+        })
+    }
+
+    scheduleReconnect() {
+        this.cancelReconnect()
+        this.log('info', 'Reconnecting in 5 seconds...')
+        this.reconnectTimer = setTimeout(() => this.connect(), 5000)
+    }
+
+    // ---------------------------------------------------------------------------
+    // Send command on persistent shell — no delay, fires immediately
+    // ---------------------------------------------------------------------------
+
+    sendCommand(command) {
+        if (!this.stream) {
+            this.log('warn', `Cannot send "${command}" — not connected`)
+            return
+        }
+        this.log('info', `Sending: ${command}`)
+        this.stream.write(command + '\n')
     }
 
     // ---------------------------------------------------------------------------
@@ -174,41 +195,31 @@ class DaLiteScreenInstance extends InstanceBase {
             screen_up: {
                 name: 'Screen Up',
                 options: [],
-                callback: async () => {
-                    await this.sendCommand('screen move up')
-                },
+                callback: () => { this.sendCommand('screen move up') },
             },
 
             screen_down: {
                 name: 'Screen Down',
                 options: [],
-                callback: async () => {
-                    await this.sendCommand('screen move down')
-                },
+                callback: () => { this.sendCommand('screen move down') },
             },
 
             screen_stop: {
                 name: 'Screen Stop',
                 options: [],
-                callback: async () => {
-                    await this.sendCommand('screen move stop')
-                },
+                callback: () => { this.sendCommand('screen move stop') },
             },
 
             screen_preset1: {
                 name: 'Screen Preset 1',
                 options: [],
-                callback: async () => {
-                    await this.sendCommand('screen preset recall 1')
-                },
+                callback: () => { this.sendCommand('screen preset recall 1') },
             },
 
             screen_preset2: {
                 name: 'Screen Preset 2',
                 options: [],
-                callback: async () => {
-                    await this.sendCommand('screen preset recall 2')
-                },
+                callback: () => { this.sendCommand('screen preset recall 2') },
             },
         })
     }
